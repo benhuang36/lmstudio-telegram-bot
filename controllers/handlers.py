@@ -1,5 +1,6 @@
 import telebot
 import time
+import re
 from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD
 from models.session import get_session, clear_session, slide_window
 from services.llm_service import ask_llm, process_lock
@@ -69,14 +70,18 @@ def register_handlers(bot):
             session["total_tokens"] = total_tokens
             slide_window(session, MAX_TOKENS_THRESHOLD)
 
-            final_reply = f"{reply_text}\n\n_⏱️ Thinking time: {elapsed_time}s_"
+            # remove thought tag
+            clean_text = re.sub(r'<thought>.*?</thought>', '', reply_text, flags=re.DOTALL)
+
+            final_reply = f"{clean_text}\n\n_⏱️ Thinking time: {elapsed_time}s_"
 
             # View: Send formatted message to user
             try:
                 bot.reply_to(message, final_reply, parse_mode='Markdown')
             except telebot.apihelper.ApiTelegramException as e:
                 log_debug(f"Markdown parsing failed: {str(e)}")
-                bot.reply_to(message, reply_text)
+                log_debug(f"final_reply: {final_reply}")
+                bot.reply_to(message, clean_text)
 
         except requests.exceptions.ConnectionError as e:
             log_debug(f"Connection error: {str(e)}")
