@@ -2,7 +2,7 @@ import telebot
 import telegramify_markdown
 import time
 import re
-from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD
+from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD, ACTIVE_LLM
 from models.session import get_session, clear_session, slide_window, update_api_key, save_sessions
 from services.llm_service import ask_llm, process_lock
 from services.tg_utils import continuous_typing
@@ -21,14 +21,39 @@ def register_handlers(bot):
         if chat_id not in ALLOWED_CHAT_IDS: return
         
         parts = message.text.split(maxsplit=1)
-        if len(parts) < 2:
-            bot.reply_to(message, "⚠️ Please use the format: `/set_api_key YOUR_API_KEY`", parse_mode='Markdown')
+
+        if len(parts) > 1:
+            # With key
+            new_key = parts[1].strip()
+            validate_and_save_key(message, chat_id, new_key)
+        else:
+            msg = bot.reply_to(message, "🗝️ Please reply to this message with your API Key, or type `cancel` to abort:", parse_mode='Markdown')
+            bot.register_next_step_handler(msg, receive_api_key_step)
+
+    def receive_api_key_step(message):
+        chat_id = message.chat.id
+        if chat_id not in ALLOWED_CHAT_IDS: return
+        
+        new_key = message.text.strip()
+        if new_key.lower() == "cancel":
+            bot.send_message(chat_id, "🚫Setting API key is canceled.")
+        else:
+            validate_and_save_key(message, chat_id, new_key)
+
+    def validate_and_save_key(message, chat_id, new_key):
+        is_valid = True
+        
+        if ACTIVE_LLM == "openai" and not new_key.startswith("sk-"):
+            is_valid = False
+        elif ACTIVE_LLM == "gemini" and not new_key.startswith("AIza"):
+            is_valid = False
+        # LM Studio keys are flexible; no strict validation needed.
+
+        if not is_valid:
+            bot.reply_to(message, f"❌ Invalid API Key format for {ACTIVE_LLM}. Setting canceled.")
             return
 
-        new_key = parts[1].strip()
         update_api_key(chat_id, new_key)
-
-        # Try to delete the message including API KEY
         try:
             bot.delete_message(chat_id, message.message_id)
             bot.send_message(chat_id, "✅ API Key updated and saved! (Your message was automatically deleted for security.)")
