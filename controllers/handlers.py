@@ -1,8 +1,9 @@
 import telebot
+import telegramify_markdown
 import time
 import re
 from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD
-from models.session import get_session, clear_session, slide_window
+from models.session import get_session, clear_session, slide_window, update_api_key, save_sessions
 from services.llm_service import ask_llm, process_lock
 from services.tg_utils import continuous_typing
 from services.tg_utils import log_debug
@@ -13,7 +14,27 @@ bot_state = {
 }
 
 def register_handlers(bot):
-    
+
+    @bot.message_handler(commands=['set_api_key'])
+    def handle_set_api_key(message):
+        chat_id = message.chat.id
+        if chat_id not in ALLOWED_CHAT_IDS: return
+        
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2:
+            bot.reply_to(message, "⚠️ Please use the format: `/set_api_key YOUR_API_KEY`", parse_mode='Markdown')
+            return
+
+        new_key = parts[1].strip()
+        update_api_key(chat_id, new_key)
+
+        # Try to delete the message including API KEY
+        try:
+            bot.delete_message(chat_id, message.message_id)
+            bot.send_message(chat_id, "✅ API Key updated and saved! (Your message was automatically deleted for security.)")
+        except:
+            bot.reply_to(message, "✅ API Key updated and saved! (Please manually delete your message containing the key for security.)")
+
     @bot.message_handler(commands=['new_session'])
     def handle_new_session(message):
         chat_id = message.chat.id
@@ -40,6 +61,14 @@ def register_handlers(bot):
 
         session = get_session(chat_id)
 
+        if not session.get("api_key"):
+            bot.reply_to(
+                message,
+                "⚠️ Please set your API key first using the command:\n`/set_api_key YOUR_API_KEY`", 
+                parse_mode='Markdown'
+            )
+            return
+
         # Request lock from Service layer
         if not process_lock.acquire(blocking=False):
             # 💡 Read the start time of the current task, and calculate elapsed time
@@ -60,7 +89,7 @@ def register_handlers(bot):
 
             with continuous_typing(bot, chat_id):
                 # Call LLM Service
-                reply_text, total_tokens = ask_llm(session["messages"])
+                reply_text, total_tokens = ask_llm(session["messages"], session.get("api_key"))
 
             # ⏱️ Calculate total elapsed time
             elapsed_time = round(time.perf_counter() - start_time, 1)
@@ -70,17 +99,20 @@ def register_handlers(bot):
             session["total_tokens"] = total_tokens
             slide_window(session, MAX_TOKENS_THRESHOLD)
 
-            # remove thought tag
+            save_sessions()
+
+            # Remove thought tag
             clean_text = re.sub(r'<thought>.*?</thought>', '', reply_text, flags=re.DOTALL)
 
             final_reply = f"{clean_text}\n\n_⏱️ Thinking time: {elapsed_time}s_"
+            tg_safe_markdown = telegramify_markdown.markdownify(final_reply)
 
             # View: Send formatted message to user
             try:
-                bot.reply_to(message, final_reply, parse_mode='Markdown')
+                bot.reply_to(message, tg_safe_markdown, parse_mode='MarkdownV2')
             except telebot.apihelper.ApiTelegramException as e:
-                log_debug(f"Markdown parsing failed: {str(e)}")
-                log_debug(f"final_reply: {final_reply}")
+                log_debug(f"MarkdownV2 parsing failed: {str(e)}")
+                log_debug(f"Failed content: {tg_safe_markdown}")
                 bot.reply_to(message, clean_text)
 
         except requests.exceptions.ConnectionError as e:

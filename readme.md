@@ -1,55 +1,51 @@
 # Telegram LLM Bridge (LM Studio / OpenAI / Gemini)
 
-This is a Telegram bot project that connects your phone to Large Language Models. It originally started as a bridge for local LLMs (via [LM Studio](https://lmstudio.ai/)), and now supports seamless switching to cloud models like OpenAI and Gemini.
+This is a Telegram bot project that connects your phone to Large Language Models. It supports local LLMs (via [LM Studio](https://lmstudio.ai/)) and cloud models like OpenAI and Gemini.
 
 > **📝 Introduction & Motivation** > This project is mainly built for practicing Python modular design and API integration. 
-> By using Telegram's Long Polling method, you can safely chat with AI from your phone anywhere—without opening router ports (Port Forwarding) or setting up HTTPS certificates.
+> By using Telegram's Long Polling method, you can safely chat with AI from your phone anywhere.
 
 ## ✨ Key Features
-* **Multi-Backend Support**: Seamlessly switch between local compute (LM Studio) and cloud APIs (OpenAI, Gemini) by changing a single toggle in the config.
-* **MVC-like Architecture**: The code is separated into Controller, Service, and Model. It is very easy to read and update.
-* **Hardware Protection (Thread Lock)**: A global lock makes sure only one request is sent to the API at a time. This prevents the model from crashing under heavy load and will tell the user if the model is busy.
-* **Sliding Window Memory**: It tracks the Token usage. When it gets close to the limit, it auto-deletes the oldest chat history to keep the conversation going smoothly.
-* **Background "Typing" Indicator**: Uses a background thread and `with` statement to keep sending the "Typing..." status to Telegram while the model is thinking.
-* **Response Time Tracking**: Auto-appends the exact thinking time (in seconds) to the final reply.
-* **Startup Logging**: Displays the currently active backend and model name in the terminal when the bot starts.
+* **Bring Your Own Key (BYOK)**: For security, there are no hardcoded keys. Users must set their own API key via Telegram commands.
+* **Persistent Memory**: Chat history and API keys are automatically saved in a local JSON file. You won't lose your chat after restarting the bot.
+* **Multi-Backend Support**: Switch between local compute (LM Studio) and cloud APIs (OpenAI, Gemini) easily in the `.env` file.
+* **Sliding Window Memory**: Auto-deletes the oldest chat history to keep the conversation going smoothly when tokens reach the limit.
+* **Safe Markdown**: Uses `telegramify_markdown` to completely prevent Telegram formatting errors.
+* **Background "Typing" Indicator**: Keeps sending the "Typing..." status to Telegram while the model is thinking.
 
 ## 🛠️ Requirements
 * **Python**: 3.8 or higher
-* **LLM Backend** (Choose at least one):
-  * **LM Studio**: Local Server must be running.
-  * **OpenAI**: API Key required.
-  * **Gemini**: API Key required (using Google's OpenAI-compatible endpoint).
 * **Python Packages**:
   * `pyTelegramBotAPI` (Handles Telegram Bot logic)
   * `requests` (Sends HTTP requests to the APIs)
+  * `python-dotenv` (Loads `.env` variables safely)
+  * `telegramify_markdown` (Ensures safe text formatting)
 
 ## 🤖 How to Create a Telegram Bot & Get IDs
-If you are new to Telegram bots, follow these simple steps to get your keys:
-
 **1. Get the Bot Token (`TELEGRAM_TOKEN`)**
 * Open Telegram and search for `@BotFather`.
-* Send the command `/newbot`.
-* Follow the prompts to give your bot a name and a unique username (must end in `bot`).
-* Once created, BotFather will give you an **HTTP API Token** (e.g., `123456789:ABCDefgh...`). Copy this token.
+* Send `/newbot` and follow the prompts.
+* Copy the **HTTP API Token** (e.g., `123456789:ABCDefgh...`).
 
 **2. Get your Chat ID (`ALLOWED_CHAT_IDS`)**
-* Search for `@userinfobot` in Telegram.
-* Send the command `/start` or just say hello.
-* It will reply with your account details. Look for the `Id` (a sequence of numbers like `123456789`). Copy this number.
+* Search for `@userinfobot` in Telegram and send `/start`.
+* Copy your `Id` (a sequence of numbers like `123456789`).
 
 ## 📂 Project Structure
 ```text
 .
 ├── main.py                  # Entry point
-├── config.py                # Global settings (API keys, active LLM toggle, etc.)
+├── config.py                # Loads settings from .env safely
+├── .env.example             # Example environment variables
+├── data/
+│   └── sessions.json        # (Auto-generated) Saves user memory and API keys
 ├── models/
-│   └── session.py           # (Model) Manages chat memory and token count
+│   └── session.py           # Manages chat memory and JSON local storage
 ├── services/
-│   ├── llm_service.py       # (Service) Routes requests to LM Studio/OpenAI/Gemini
-│   └── tg_utils.py          # (Service) Telegram tools (Typing thread and debug logs)
+│   ├── llm_service.py       # Routes requests to LM Studio/OpenAI/Gemini
+│   └── tg_utils.py          # Telegram tools (Typing thread and debug logs)
 └── controllers/
-    └── handlers.py          # (Controller) Handles Telegram commands and logic
+    └── handlers.py          # Handles Telegram commands and logic
 ```
 
 ## 🚀 How to Install and Run
@@ -68,27 +64,28 @@ source venv/bin/activate
 
 **3. Install packages**
 ```bash
-pip install pyTelegramBotAPI requests
+pip install pyTelegramBotAPI requests python-dotenv telegramify_markdown
 ```
 
 **4. Setup Environment Variables**
-Please create or open `config.py` (you can copy from `config.example.py` if available) and fill in your information:
-* `TELEGRAM_TOKEN`: Your bot token from @BotFather.
-* `ALLOWED_CHAT_IDS`: Your own Telegram User ID (numbers) to prevent strangers from using your bot.
-* `ACTIVE_LLM`: Set to `"lm_studio"`, `"openai"`, or `"gemini"`.
-* Fill in the corresponding URL and API Key for your chosen backend.
+Copy the example config file:
+```bash
+cp .env.example .env
+```
+Open the `.env` file and fill in your `TELEGRAM_TOKEN` and `ALLOWED_CHAT_IDS`. You can also choose your default `ACTIVE_LLM` here.
 
-**5. Run the bot (Optional: using tmux for background running)**
+**5. Run the bot (using tmux for background running)**
 ```bash
 tmux new -s tg_bot
 python main.py
 ```
-*(After you see the startup log in the terminal, press `Ctrl+b` then `d` to leave it running in the background)*
+*(After you see the startup log, press `Ctrl+b` then `d` to leave it running in the background)*
 
 ## 💬 Telegram Commands
-* **Text messages**: Chat directly with your active model.
-* `/current_usage`: Check how many tokens and chat turns you have used so far.
+The command menu will automatically show up in Telegram. 
+* `/set_api_key YOUR_KEY`: **(Required)** Set your personal API key before you start chatting.
 * `/new_session`: Clear your chat memory and start a new conversation.
+* `/current_usage`: Check token usage and chat turns.
 
 ---
 *Developed for learning and open-source sharing.*

@@ -2,33 +2,28 @@ import requests
 import threading
 from config import (
     ACTIVE_LLM,
-    LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL,
-    OPENAI_URL, OPENAI_API_KEY, OPENAI_MODEL,
-    GEMINI_URL, GEMINI_API_KEY, GEMINI_MODEL
+    LM_STUDIO_URL, LM_STUDIO_MODEL,
+    OPENAI_URL, OPENAI_MODEL,
+    GEMINI_URL, GEMINI_MODEL
 )
 
-# Global lock for hardware resource management
 process_lock = threading.Lock()
 
-def ask_llm(messages):
-    """Send request to the active LLM backend and return (reply text, total tokens used)"""
+def ask_llm(messages, user_api_key):
+    """Send request to the active LLM backend using the user's personal API key"""
 
-    # Check config to determine which backend to use
     if ACTIVE_LLM == "openai":
         api_url = OPENAI_URL
-        api_key = OPENAI_API_KEY
         model_name = OPENAI_MODEL
     elif ACTIVE_LLM == "gemini":
         api_url = GEMINI_URL
-        api_key = GEMINI_API_KEY
         model_name = GEMINI_MODEL
     else:
         api_url = LM_STUDIO_URL
-        api_key = LM_STUDIO_API_KEY
         model_name = LM_STUDIO_MODEL
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {user_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -38,7 +33,6 @@ def ask_llm(messages):
         "temperature": 0.7
     }
 
-    # Do not handle Exceptions here, let the Controller handle them
     response = requests.post(api_url, headers=headers, json=payload)
     response.raise_for_status()
 
