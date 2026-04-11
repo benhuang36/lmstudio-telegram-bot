@@ -3,9 +3,9 @@ import telegramify_markdown
 import time
 import re
 from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD, ACTIVE_LLM, MAX_SINGLE_FILE_SIZE
-from models.session import get_session, clear_session, slide_window, update_api_key, save_sessions
+from models.session import get_session, clear_session, slide_window, update_api_key, add_message, save_total_tokens, save_session
 from services.llm_service import ask_llm, get_user_lock
-from services.tg_utils import continuous_typing
+from services.tg_utils import continuous_typing, split_text
 from services.tg_utils import log_debug
 import requests
 
@@ -97,7 +97,7 @@ def register_handlers(bot):
             final_input = combined_prompt
 
             session["file_buffer"] = []
-            save_sessions()
+            save_session(chat_id, session)
         else:
             final_input = user_intent
 
@@ -123,6 +123,7 @@ def register_handlers(bot):
 
         try:
             session["messages"].append({"role": "user", "content": final_input})
+            add_message(chat_id, "user", final_input)
 
             # ⏱️ Record start time and save to global state
             start_time = time.perf_counter() 
@@ -137,24 +138,29 @@ def register_handlers(bot):
 
             # Update Model state
             session["messages"].append({"role": "assistant", "content": reply_text})
+            add_message(chat_id, "assistant", reply_text)
             session["total_tokens"] = total_tokens
-            slide_window(session, MAX_TOKENS_THRESHOLD)
+            slide_window(chat_id, MAX_TOKENS_THRESHOLD)
 
-            save_sessions()
+            save_total_tokens(chat_id, total_tokens)
 
             # Remove thought tag
             clean_text = re.sub(r'<thought>.*?</thought>', '', reply_text, flags=re.DOTALL)
 
             final_reply = f"{clean_text}\n\n_⏱️ Thinking time: {elapsed_time}s_"
             tg_safe_markdown = telegramify_markdown.markdownify(final_reply)
+            message_chunks = split_text(tg_safe_markdown)
 
             # View: Send formatted message to user
             try:
-                bot.reply_to(message, tg_safe_markdown, parse_mode='MarkdownV2')
+                for chunk in message_chunks:
+                    bot.reply_to(message, chunk, parse_mode='MarkdownV2')
             except telebot.apihelper.ApiTelegramException as e:
                 log_debug(f"MarkdownV2 parsing failed: {str(e)}")
                 log_debug(f"Failed content: {tg_safe_markdown}")
-                bot.reply_to(message, clean_text)
+                plain_chunks = split_text(clean_text)
+                for chunk in plain_chunks:
+                    bot.reply_to(message, chunk)
 
         except requests.exceptions.ConnectionError as e:
             log_debug(f"Connection error: {str(e)}")
@@ -176,6 +182,11 @@ def register_handlers(bot):
     def handle_document(message):
         chat_id = message.chat.id
         if chat_id not in ALLOWED_CHAT_IDS: return
+
+        user_lock = get_user_lock(chat_id)
+        if not user_lock.acquire(blocking=True):
+            bot.reply_to(message, "⏳ Oops! System busy, please try again later!")
+            return
 
         session = get_session(chat_id)
         file_name = message.document.file_name
@@ -204,9 +215,12 @@ def register_handlers(bot):
                 "name": file_name,
                 "content": content
             })
-            save_sessions()
+            save_session(chat_id, session)
 
             bot.reply_to(message, f"📥 `{file_name}` added to buffer. (Total: {len(session['file_buffer'])} files)\nYou can send more files or type your instructions.")
 
         except Exception as e:
             bot.reply_to(message, f"❌ Failed to process file: {str(e)}")
+
+        finally:
+            user_lock.release()

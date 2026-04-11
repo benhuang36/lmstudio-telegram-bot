@@ -7,7 +7,7 @@ This is a Telegram bot project that connects your phone to Large Language Models
 
 ## ✨ Key Features
 * **Bring Your Own Key (BYOK)**: For security, there are no hardcoded keys. Users must set their own API key via Telegram commands.
-* **Persistent Memory**: Chat history and API keys are automatically saved in a local JSON file. You won't lose your chat after restarting the bot.
+* **Persistent Memory**: Chat history and API keys are securely stored in a local SQLite database, ensuring your conversations are preserved even after bot restarts.
 * **Multi-Backend Support**: Switch between local compute (LM Studio) and cloud APIs (OpenAI, Gemini) easily in the `.env` file.
 * **Sliding Window Memory**: Auto-deletes the oldest chat history to keep the conversation going smoothly when tokens reach the limit.
 * **Safe Markdown**: Uses `telegramify_markdown` to completely prevent Telegram formatting errors.
@@ -39,7 +39,7 @@ This is a Telegram bot project that connects your phone to Large Language Models
 ├── config.py                # Loads settings from .env safely
 ├── .env.example             # Example environment variables
 ├── data/
-│   └── sessions.json        # (Auto-generated) Saves user memory and API keys
+│   └── sessions.db          # (Auto-generated) SQLite database for user memory and API keys
 ├── models/
 │   └── session.py           # Manages chat memory and JSON local storage
 ├── services/
@@ -126,7 +126,7 @@ You can send files directly to the bot to let the AI analyze your code or docume
 |SYSTEM_PROMPT|The initial instruction for the AI's personality.|
 
 ## 💾 Data Persistence
-The project automatically creates a `data/` directory. When running via Docker, this directory is mounted as a volume. This ensures your API keys and Chat History remain safe during updates or container restarts.
+The project automatically creates a `data/` directory. When running via Docker, this directory is mounted as a volume. By using SQLite, this ensures your API keys and Chat History remain safe and consistent during updates or container restarts.
 
 ---
 *Developed for learning and open-source sharing.*
