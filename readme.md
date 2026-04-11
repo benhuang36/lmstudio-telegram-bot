@@ -50,6 +50,7 @@ This is a Telegram bot project that connects your phone to Large Language Models
 
 ## 🚀 How to Install and Run
 
+### Option 1: Native Installation
 **1. Clone the code**
 ```bash
 git clone https://github.com/benhuang36/lmstudio-telegram-bot.git
@@ -81,11 +82,40 @@ python main.py
 ```
 *(After you see the startup log, press `Ctrl+b` then `d` to leave it running in the background)*
 
+### Option 2: Docker Deployment (Recommended)
+**1. Prepare `.env`**
+``` bash
+cp .env.example .env
+# Update your TELEGRAM_TOKEN and ALLOWED_CHAT_IDS in .env
+```
+
+**2. Start the bot:**
+``` bash
+docker compose up -d
+```
+
+**3. Check logs:**
+``` bash
+docker compose logs -f
+```
+
 ## 💬 Telegram Commands
 The command menu will automatically show up in Telegram. 
 * `/set_api_key YOUR_KEY`: **(Required)** Set your personal API key before you start chatting.
 * `/new_session`: Clear your chat memory and start a new conversation.
 * `/current_usage`: Check token usage and chat turns.
+
+## ⚙️ Environment Variables `(.env)`
+|Variable|Description|
+|----|----|
+|APP_VERSION|Current version of the app (used for Docker tagging).|
+|TELEGRAM_TOKEN|Your Bot Token from @BotFather.|
+|ALLOWED_CHAT_IDS|Comma-separated list of allowed Telegram User IDs.|
+|ACTIVE_LLM|Choose between gemini, openai, or lm_studio.|
+|SYSTEM_PROMPT|The initial instruction for the AI's personality.|
+
+## 💾 Data Persistence
+The project automatically creates a `data/` directory. When running via Docker, this directory is mounted as a volume. This ensures your API keys and Chat History remain safe during updates or container restarts.
 
 ---
 *Developed for learning and open-source sharing.*
