@@ -12,6 +12,7 @@ This is a Telegram bot project that connects your phone to Large Language Models
 * **Sliding Window Memory**: Auto-deletes the oldest chat history to keep the conversation going smoothly when tokens reach the limit.
 * **Safe Markdown**: Uses `telegramify_markdown` to completely prevent Telegram formatting errors.
 * **Background "Typing" Indicator**: Keeps sending the "Typing..." status to Telegram while the model is thinking.
+* **File-to-Context Support**: Upload source code or text files (e.g., .py, .swift, .md) to provide context. The bot buffers these files and combines them with your final prompt for a comprehensive answer.
 
 ## 🛠️ Requirements
 * **Python**: 3.8 or higher
@@ -105,6 +106,15 @@ The command menu will automatically show up in Telegram.
 * `/new_session`: Clear your chat memory and start a new conversation.
 * `/current_usage`: Check token usage and chat turns.
 
+## 📂 File Upload Support
+You can send files directly to the bot to let the AI analyze your code or documents:
+1. **Upload Files**: Send one or more supported files (`.c`, `.kt`, `.py`, `.swift`, `.h`, `.sh`, `.json`, `.txt`, `.md`).
+2. **Context Buffering**: The bot will store these files in a temporary buffer.
+3. **Ask Questions**: Once you send a text message, the bot will combine all buffered files with your question and send them to the AI.
+4. **Automatic Clear**: The buffer is automatically cleared after each AI response.
+
+*Note: To ensure stability, there is a maximum file size limit defined by `MAX_SINGLE_FILE_SIZE` in the `.env` file.*
+
 ## ⚙️ Environment Variables `(.env)`
 |Variable|Description|
 |----|----|
@@ -112,6 +122,7 @@ The command menu will automatically show up in Telegram.
 |TELEGRAM_TOKEN|Your Bot Token from @BotFather.|
 |ALLOWED_CHAT_IDS|Comma-separated list of allowed Telegram User IDs.|
 |ACTIVE_LLM|Choose between gemini, openai, or lm_studio.|
+| MAX_SINGLE_FILE_SIZE | Maximum allowed size for a single uploaded file (in bytes). e.g., `1048576` for 1MB. |
 |SYSTEM_PROMPT|The initial instruction for the AI's personality.|
 
 ## 💾 Data Persistence

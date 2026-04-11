@@ -13,6 +13,7 @@ ALLOWED_CHAT_IDS = [int(x.strip()) for x in allowed_ids_str.split(",") if x.stri
 
 ACTIVE_LLM = os.getenv("ACTIVE_LLM", "lm_studio")
 MAX_TOKENS_THRESHOLD = int(os.getenv("MAX_TOKENS_THRESHOLD", "13000"))
+MAX_SINGLE_FILE_SIZE = int(os.getenv("MAX_SINGLE_FILE_SIZE", "1048576"))
 
 LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "")
 LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "local-model")

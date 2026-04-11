@@ -7,7 +7,14 @@ from config import (
     GEMINI_URL, GEMINI_MODEL
 )
 
-process_lock = threading.Lock()
+user_locks = {}
+manager_lock = threading.Lock()
+
+def get_user_lock(chat_id):
+    with manager_lock:
+        if chat_id not in user_locks:
+            user_locks[chat_id] = threading.Lock()
+        return user_locks[chat_id]
 
 def ask_llm(messages, user_api_key):
     """Send request to the active LLM backend using the user's personal API key"""

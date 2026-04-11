@@ -33,7 +33,8 @@ def get_session(chat_id):
             # 💡 reserve system prompt
             "messages": [{"role": "system", "content": SYSTEM_PROMPT}], 
             "total_tokens": 0,
-            "api_key": None
+            "api_key": None,
+            "file_buffer": []
         }
         save_sessions()
     return user_sessions[cid]
@@ -51,7 +52,8 @@ def clear_session(chat_id):
     user_sessions[cid] = {
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}], 
         "total_tokens": 0,
-        "api_key": old_api_key
+        "api_key": old_api_key,
+        "file_buffer": []
     }
     save_sessions()
 

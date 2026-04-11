@@ -2,9 +2,9 @@ import telebot
 import telegramify_markdown
 import time
 import re
-from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD, ACTIVE_LLM
+from config import ALLOWED_CHAT_IDS, MAX_TOKENS_THRESHOLD, ACTIVE_LLM, MAX_SINGLE_FILE_SIZE
 from models.session import get_session, clear_session, slide_window, update_api_key, save_sessions
-from services.llm_service import ask_llm, process_lock
+from services.llm_service import ask_llm, get_user_lock
 from services.tg_utils import continuous_typing
 from services.tg_utils import log_debug
 import requests
@@ -85,6 +85,21 @@ def register_handlers(bot):
             return
 
         session = get_session(chat_id)
+        user_intent = message.text
+
+        if session.get("file_buffer"):
+            combined_prompt = "I have uploaded the following files:\n\n"
+            for f in session["file_buffer"]:
+                combined_prompt += f"--- File: {f['name']} ---\n{f['content']}\n\n"
+
+            combined_prompt += f"--- User Intent ---\n{user_intent}"
+
+            final_input = combined_prompt
+
+            session["file_buffer"] = []
+            save_sessions()
+        else:
+            final_input = user_intent
 
         if not session.get("api_key"):
             bot.reply_to(
@@ -95,7 +110,8 @@ def register_handlers(bot):
             return
 
         # Request lock from Service layer
-        if not process_lock.acquire(blocking=False):
+        user_lock = get_user_lock(chat_id)
+        if not user_lock.acquire(blocking=False):
             # 💡 Read the start time of the current task, and calculate elapsed time
             start_t = bot_state.get("thinking_start_time")
             if start_t:
@@ -106,7 +122,7 @@ def register_handlers(bot):
             return
 
         try:
-            session["messages"].append({"role": "user", "content": message.text})
+            session["messages"].append({"role": "user", "content": final_input})
 
             # ⏱️ Record start time and save to global state
             start_time = time.perf_counter() 
@@ -154,4 +170,43 @@ def register_handlers(bot):
 
         finally:
             bot_state["thinking_start_time"] = None
-            process_lock.release()
+            user_lock.release()
+
+    @bot.message_handler(content_types=['document'])
+    def handle_document(message):
+        chat_id = message.chat.id
+        if chat_id not in ALLOWED_CHAT_IDS: return
+
+        session = get_session(chat_id)
+        file_name = message.document.file_name
+        file_size = message.document.file_size
+        max_size_in_kb = round(MAX_SINGLE_FILE_SIZE / 1024, 2)
+        if file_size > MAX_SINGLE_FILE_SIZE:
+            size_in_kb = round(file_size / 1024, 2)
+            bot.reply_to(message, f"❌ Oops! That file is a bit too large. Please keep it under {max_size_in_kb}KB (Current size: {size_in_kb}KB)")
+            return
+
+        # 💡 check supported extension names.
+        allowed_extensions = ('.c', '.kt', '.py', '.swift', '.h', '.sh', '.json', '.txt', '.md')
+        if not file_name.lower().endswith(allowed_extensions):
+            bot.reply_to(message, f"❌ Unsupported file type: {file_name}")
+            return
+
+        try:
+            file_info = bot.get_file(message.document.file_id)
+            log_debug(f"file_info.file_path: {file_info.file_path}")
+            downloaded_file = bot.download_file(file_info.file_path)
+            content = downloaded_file.decode('utf-8')
+            log_debug(f"download file complete")
+
+            # 💡 save file info in buffer
+            session["file_buffer"].append({
+                "name": file_name,
+                "content": content
+            })
+            save_sessions()
+
+            bot.reply_to(message, f"📥 `{file_name}` added to buffer. (Total: {len(session['file_buffer'])} files)\nYou can send more files or type your instructions.")
+
+        except Exception as e:
+            bot.reply_to(message, f"❌ Failed to process file: {str(e)}")
