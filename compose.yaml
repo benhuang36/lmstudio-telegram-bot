@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    image: tg-llm-bot:${APP_VERSION:-latest}
+    container_name: my_tg_bot
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

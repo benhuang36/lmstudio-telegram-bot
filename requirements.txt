@@ -1,0 +1,4 @@
+pyTelegramBotAPI==4.32.0
+requests==2.33.1
+python-dotenv==1.2.2
+telegramify-markdown==1.1.2

@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+APP_VERSION = os.getenv("APP_VERSION", "unknown")
+
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1")
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")

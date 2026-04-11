@@ -1,6 +1,6 @@
 import telebot
 from telebot.types import BotCommand
-from config import TELEGRAM_TOKEN
+from config import APP_VERSION, TELEGRAM_TOKEN
 from controllers.handlers import register_handlers
 from services.llm_service import get_active_model_info
 
@@ -14,7 +14,8 @@ def setup_menu(bot):
     print("Command menu has been successfully set up!")
 
 def main():
-    print("Initializing Telegram Bot...")
+    print(f"🚀 Initializing Telegram Bot v{APP_VERSION}")
+
     bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
     setup_menu(bot)
