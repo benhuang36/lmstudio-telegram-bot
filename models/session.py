@@ -100,9 +100,9 @@ def update_session_stats(chat_id, api_key=None, total_tokens=None):
     with get_db_connection() as conn:
         if api_key is not None:
             conn.execute("UPDATE sessions SET api_key = ? WHERE chat_id = ?", (api_key, cid))
-    if total_tokens is not None:
-        conn.execute("UPDATE sessions SET total_tokens = ? WHERE chat_id = ?", (total_tokens, cid))
-        conn.commit()
+        if total_tokens is not None:
+            conn.execute("UPDATE sessions SET total_tokens = ? WHERE chat_id = ?", (total_tokens, cid))
+            conn.commit()
 
 def update_api_key(chat_id, api_key):
     """Update the API Key."""
@@ -143,6 +143,9 @@ def slide_window(chat_id, threshold):
     # Logic: If total_tokens is too high, delete the two oldest messages (user + assistant)
     # until tokens are below the threshold (simplified to deleting two records per call).
     with get_db_connection() as conn:
+        res = conn.execute("SELECT total_tokens FROM sessions WHERE chat_id = ?", (cid,)).fetchone()
+        if not res or res['total_tokens'] <= threshold:
+            return
 
         oldest_ids = conn.execute(
             "SELECT id FROM messages WHERE chat_id = ? AND role != 'system' ORDER BY id ASC LIMIT 2",
